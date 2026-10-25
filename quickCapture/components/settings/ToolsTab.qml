@@ -35,6 +35,7 @@ SettingsGroup {
     }
 
     function toggleOcrLang(lang) {
+        loadOcrLangs();
         const list = selectedOcrLangs.slice();
         const index = list.indexOf(lang);
         if (index >= 0) {
@@ -64,7 +65,19 @@ SettingsGroup {
                         if (l !== "" && l !== "osd")
                             langs.push(l);
                     }
-                    availableOcrLangs = langs.sort();
+                    const available = langs.sort();
+                    availableOcrLangs = available;
+                    if (available.length > 0) {
+                        const reconciled = selectedOcrLangs.filter(lang => available.indexOf(lang) >= 0);
+                        if (reconciled.length === 0)
+                            reconciled.push(available.indexOf("eng") >= 0 ? "eng" : available[0]);
+                        if (reconciled.join("+") !== selectedOcrLangs.join("+")) {
+                            selectedOcrLangs = reconciled;
+                            const settings = findSettings();
+                            if (settings)
+                                settings.saveValue("ocrLanguage", reconciled.join("+"));
+                        }
+                    }
                 }
             },
             0
@@ -359,7 +372,9 @@ SettingsGroup {
         icon: "document_scanner"
 
         InfoText {
-            text: I18n.trFor("quickCapture", "Select one or more installed Tesseract language packs for OCR text recognition.")
+            text: root.availableOcrLangs.length > 0
+                ? I18n.trFor("quickCapture", "Select one or more installed Tesseract language packs for OCR text recognition.")
+                : I18n.trFor("quickCapture", "No Tesseract language packs found. Ensure tesseract is installed and has language data packages.")
         }
 
         Flow {
@@ -379,7 +394,15 @@ SettingsGroup {
                     width: (ocrLangFlow.width - (Theme.spacingS * 2)) / 3
                     height: 36
                     radius: Theme.cornerRadius
-                    color: isSelected ? Theme.primary : Theme.surfaceContainerHigh
+                    color: isSelected ? Theme.primary : (chipMouseArea.containsMouse ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh)
+                    border.color: activeFocus ? Theme.primary : "transparent"
+                    border.width: 2
+
+                    focus: true
+                    activeFocusOnTab: true
+                    Keys.onReturnPressed: root.toggleOcrLang(langChip.modelData)
+                    Keys.onEnterPressed: root.toggleOcrLang(langChip.modelData)
+                    Keys.onSpacePressed: root.toggleOcrLang(langChip.modelData)
 
                     Row {
                         anchors.centerIn: parent
@@ -400,9 +423,14 @@ SettingsGroup {
                     }
 
                     MouseArea {
+                        id: chipMouseArea
                         anchors.fill: parent
+                        hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.toggleOcrLang(langChip.modelData)
+                        onClicked: {
+                            langChip.forceActiveFocus();
+                            root.toggleOcrLang(langChip.modelData);
+                        }
                     }
                 }
             }
